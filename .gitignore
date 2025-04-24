@@ -1,0 +1,11 @@
+# Node modules
+**/node_modules
+
+# Environment files
+**/.env
+
+# Build and logs
+**/dist
+**/build
+npm-debug.log
+.DS_Store
