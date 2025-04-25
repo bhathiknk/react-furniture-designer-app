@@ -8,7 +8,15 @@ import {
     ContactShadows,
     useGLTF
 } from '@react-three/drei';
-import { Stage, Layer, Rect, Text, Line } from 'react-konva';
+import {
+    Stage,
+    Layer,
+    Rect,
+    Text,
+    Line,
+    Arrow,
+    Group
+} from 'react-konva';
 import { useState } from 'react';
 import * as THREE from 'three';
 
@@ -43,6 +51,22 @@ const furnitureModels = {
     dining_chair: '/models/furniture/dining_chair.glb'
 };
 
+// just above your JSX in RoomEditor():
+const floorOffsets = {
+    chair:         0.01,
+    sofa:          0.02,
+    bed:           0.01,
+    table:         0.01,
+    lamp:          1.8,
+    wardrobe:      1.5,
+    bookshelf:     1.4,
+    coffee_table:  0.01,
+    desk:          0.01,
+    dining_chair:  0.01
+};
+const DEFAULT_OFFSET = 0.01;
+
+
 const roomDefinitions = {
     living:  { default:{ width:600, depth:500, height:300 }, textures:{ floor:'/textures/wood_floor.jpg', wall:'/textures/paint_wall.jpg' } },
     kitchen: { default:{ width:400, depth:300, height:300 }, textures:{ floor:'/textures/tile_floor.jpg', wall:'/textures/kitchen_wall_tiled.jpg' } },
@@ -72,10 +96,10 @@ function RoomBox({ width, depth, height, textures, openSide, wallTint }) {
     wallMap.repeat.set(width/SCALE3D, height/SCALE3D);
 
     const walls = [
-        { name:'back',  rot:[0,0,0],        pos:[0, height/(2*SCALE3D), -depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
-        { name:'front', rot:[0,Math.PI,0],  pos:[0, height/(2*SCALE3D),  depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
-        { name:'left',  rot:[0,Math.PI/2,0],pos:[-width/(2*SCALE3D), height/(2*SCALE3D), 0],  size:[depth/SCALE3D, height/SCALE3D] },
-        { name:'right', rot:[0,-Math.PI/2,0],pos:[ width/(2*SCALE3D), height/(2*SCALE3D),0],  size:[depth/SCALE3D, height/SCALE3D] }
+        { name:'back',  rot:[0,0,0],         pos:[0, height/(2*SCALE3D), -depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
+        { name:'front', rot:[0,Math.PI,0],   pos:[0, height/(2*SCALE3D),  depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
+        { name:'left',  rot:[0,Math.PI/2,0], pos:[-width/(2*SCALE3D), height/(2*SCALE3D), 0],   size:[depth/SCALE3D, height/SCALE3D] },
+        { name:'right', rot:[0,-Math.PI/2,0],pos:[ width/(2*SCALE3D), height/(2*SCALE3D), 0],   size:[depth/SCALE3D, height/SCALE3D] }
     ];
 
     return (
@@ -98,89 +122,66 @@ export default function RoomEditor() {
     const { roomKey } = useParams();
     const nav = useNavigate();
     const defOrig = roomDefinitions[roomKey];
-    const { default: def, textures } = defOrig || roomDefinitions['living'];
+    const { default: def, textures } = defOrig||roomDefinitions['living'];
 
-    // state
     const [view, setView]         = useState('2D');
     const [width, setWidth]       = useState(def.width);
     const [depth, setDepth]       = useState(def.depth);
     const [height, setHeight]     = useState(def.height);
     const [wallTint, setWallTint] = useState('');
     const [furniture, setFurniture]          = useState([]);
-    const [selectedFurnitureId, setSelected] = useState(null);
+    const [selectedId, setSelected] = useState(null);
 
     if (!defOrig && view==='2D') {
-        return (
-            <div style={styles.fallback}>
-                <p style={styles.fallbackText}>Unknown room type.</p>
-                <button style={styles.backButton} onClick={()=>nav('/dashboard')}>← Back</button>
-            </div>
-        );
+        return <div style={styles.fallback}>
+            <p style={styles.fallbackText}>Unknown room type.</p>
+            <button style={styles.backButton} onClick={()=>nav('/dashboard')}>← Back</button>
+        </div>;
     }
 
-    // viewport & centering
     const vw = window.innerWidth, vh = window.innerHeight;
-    const x0 = (vw - width)/2, y0 = (vh - depth)/2;
-    const maxDim3 = Math.max(width, depth)/SCALE3D;
-    const camY    = height/SCALE3D*0.6 + maxDim3*0.4;
-    const camZ    = maxDim3*1.2;
+    const x0 = (vw-width)/2, y0 = (vh-depth)/2;
+    const max3 = Math.max(width,depth)/SCALE3D;
+    const camY = height/SCALE3D*0.6 + max3*0.4;
+    const camZ = max3*1.2;
 
-    // add at center
     const addFurniture = type => {
-        setFurniture(f => [
-            ...f,
-            { id:Date.now(), type, x:x0+width/2, y:y0+depth/2, size:40, rotation:0 }
-        ]);
+        setFurniture(f=>[...f, {
+            id: Date.now(),
+            type,
+            x: x0+width/2,
+            y: y0+depth/2,
+            size: 40,
+            rotation: 0
+        }]);
         setSelected(null);
     };
-
-    // resize selected
-    const resizeSelected = delta => {
-        setFurniture(fs =>
-            fs.map(i =>
-                i.id===selectedFurnitureId
-                    ? { ...i, size: Math.max(10, i.size+delta) }
-                    : i
-            )
-        );
-    };
-
-    // rotate selected
-    const rotateSelected = delta => {
-        setFurniture(fs =>
-            fs.map(i =>
-                i.id===selectedFurnitureId
-                    ? { ...i, rotation: (i.rotation + delta + 360) % 360 }
-                    : i
-            )
-        );
-    };
+    const resizeSel = d => setFurniture(fs=>fs.map(i=>i.id===selectedId?{...i,size:Math.max(10,i.size+d)}:i));
+    const rotateSel = d => setFurniture(fs=>fs.map(i=>i.id===selectedId?{...i,rotation:(i.rotation+d+360)%360}:i));
 
     return (
         <div style={styles.container}>
-            {/* Tabs */}
             <div style={styles.tabs}>
-                {['2D','3D'].map(tab=>(
-                    <button key={tab}
-                            onClick={()=>setView(tab)}
-                            style={{...styles.tab, ...(view===tab?styles.activeTab:{})}}>
-                        {tab} View
+                {['2D','3D'].map(t=>(
+                    <button key={t}
+                            onClick={()=>setView(t)}
+                            style={{...styles.tab, ...(view===t?styles.activeTab:{})}}>
+                        {t} View
                     </button>
                 ))}
             </div>
 
-            {/* Furniture Palette */}
             {view==='2D' && (
                 <div style={styles.palette}>
                     {Object.keys(furnitureModels).map(type=>(
-                        <button key={type} style={styles.iconBtn} onClick={()=>addFurniture(type)}>
+                        <button key={type} style={styles.iconBtn}
+                                onClick={()=>addFurniture(type)}>
                             {type.replace('_',' ')}
                         </button>
                     ))}
                 </div>
             )}
 
-            {/* Controls + resize/rotate */}
             {view==='2D' && (
                 <div style={styles.controls}>
                     <h4 style={styles.controlHeader}>Room Settings</h4>
@@ -189,78 +190,92 @@ export default function RoomEditor() {
                     <DimensionControl label="Height(px)" value={height} onChange={setHeight} min={10} max={vh} step={1}/>
                     <div style={styles.tintGroup}>
                         <label style={styles.tintLabel}>Wall Tint:</label>
-                        <input type="color" value={wallTint} onChange={e=>setWallTint(e.target.value)} style={styles.colorInput}/>
+                        <input type="color" value={wallTint}
+                               onChange={e=>setWallTint(e.target.value)}
+                               style={styles.colorInput}/>
                         <button onClick={()=>setWallTint('')} style={styles.resetButton}>Reset</button>
                     </div>
-                    {selectedFurnitureId && (
+                    {selectedId && (
                         <div style={styles.sizeControls}>
-                            <button onClick={()=>resizeSelected(+10)}>Increase Size</button>
-                            <button onClick={()=>resizeSelected(-10)}>Decrease Size</button>
-                            <button onClick={()=>rotateSelected(+15)}>Rotate +15°</button>
-                            <button onClick={()=>rotateSelected(-15)}>Rotate -15°</button>
+                            <button onClick={()=>resizeSel(+10)}>Increase</button>
+                            <button onClick={()=>resizeSel(-10)}>Decrease</button>
+                            <button onClick={()=>rotateSel(+15)}>Rotate +15°</button>
+                            <button onClick={()=>rotateSel(-15)}>Rotate -15°</button>
                         </div>
                     )}
                 </div>
             )}
 
-            {/* Main Content */}
             {view==='2D' ? (
                 <Stage width={vw} height={vh} style={styles.fullStage}>
                     <Layer>
                         <Rect x={x0} y={y0} width={width} height={depth}
                               fill="#fafafa" stroke={wallTint||'#2980b9'} strokeWidth={4} cornerRadius={6}/>
                         {furniture.map(item=>(
-                            <Rect
-                                key={item.id}
-                                x={item.x} y={item.y}
-                                width={item.size} height={item.size}
-                                offset={{ x:item.size/2, y:item.size/2 }}
-                                rotation={item.rotation}
-                                fill={ item.id===selectedFurnitureId ? 'rgba(41,128,185,0.4)' : 'rgba(0,0,0,0.2)' }
-                                draggable
-                                onClick={()=>setSelected(item.id)}
-                                onDragMove={e=>setFurniture(fs =>
-                                    fs.map(f=> f.id===item.id
-                                        ? { ...f, x:e.target.x(), y:e.target.y() }
-                                        : f
-                                    )
-                                )}
-                            />
+                            <Group key={item.id}
+                                   x={item.x} y={item.y}
+                                   offset={{ x:item.size/2, y:item.size/2 }}
+                                   rotation={item.rotation}
+                                   draggable
+                                   onClick={()=>setSelected(item.id)}
+                                   onDragMove={e=>setFurniture(fs=>
+                                       fs.map(f=>f.id===item.id?
+                                           {...f,x:e.target.x(),y:e.target.y()}:f
+                                       )
+                                   )}>
+                                <Rect width={item.size} height={item.size}
+                                      fill={item.id===selectedId?'rgba(41,128,185,0.4)':'rgba(0,0,0,0.2)'}/>
+                                <Arrow
+                                    points={[0, -item.size/2, 0, -item.size]}
+                                    pointerLength={10}
+                                    pointerWidth={10}
+                                    fill="#e74c3c"
+                                    stroke="#e74c3c"
+                                />
+                            </Group>
                         ))}
-                        <Text text={`${width}px`} x={x0+width/2-20} y={y0-24} fontSize={16} fill="#2c3e50"/>
-                        <Text text={`${depth}px`} x={x0+width+8} y={y0+depth/2-8} fontSize={16} fill="#2c3e50"/>
+                        <Text text={`${width}px`}  x={x0+width/2-20} y={y0-24} fontSize={16} fill="#2c3e50"/>
+                        <Text text={`${depth}px`}  x={x0+width+8}  y={y0+depth/2-8} fontSize={16} fill="#2c3e50"/>
                         <Line points={[x0-30,y0, x0-30,y0+height]} stroke="#2c3e50" strokeWidth={2}/>
                         <Text text={`${height}px`} x={x0-60} y={y0+height/2-8} fontSize={16} fill="#2c3e50"/>
                     </Layer>
                 </Stage>
             ) : (
-                <Canvas shadows camera={{ position:[0,camY,camZ], fov:60 }} style={styles.canvas}>
+                <Canvas shadows camera={{position:[0,camY,camZ],fov:60}} style={styles.canvas}>
                     <ambientLight intensity={0.5}/>
                     <directionalLight castShadow position={[5,10,5]} intensity={1}
                                       shadow-mapSize-width={1024} shadow-mapSize-height={1024}
-                                      shadow-camera-far={maxDim3*3}
-                                      shadow-camera-left={-maxDim3} shadow-camera-right={maxDim3}
-                                      shadow-camera-top={maxDim3} shadow-camera-bottom={-maxDim3}
-                    />
+                                      shadow-camera-far={max3*3}
+                                      shadow-camera-left={-max3} shadow-camera-right={max3}
+                                      shadow-camera-top={max3} shadow-camera-bottom={-max3}/>
                     <Environment preset="sunset" background={false}/>
                     <RoomBox width={width} depth={depth} height={height}
                              textures={textures} openSide="front" wallTint={wallTint}/>
-                    {furniture.map(item=>(
-                        <Furniture3D key={item.id}
-                                     modelUrl={furnitureModels[item.type]}
-                                     type={item.type}
-                                     position={[
-                                         THREE.MathUtils.clamp((item.x - x0 - width/2)/SCALE3D, -width/(2*SCALE3D), width/(2*SCALE3D)),
-                                         // lift lamp & wardrobe so they rest on floor
-                                         item.type==='lamp'     ? 1.8 :
-                                             item.type==='wardrobe'? 1.5 : 0.01,
-                                         THREE.MathUtils.clamp(-(item.y - y0 - depth/2)/SCALE3D, -depth/(2*SCALE3D), depth/(2*SCALE3D))
-                                     ]}
-                                     rotation={item.rotation}
+                    {furniture.map(item => (
+                        <Furniture3D
+                            key={item.id}
+                            modelUrl={furnitureModels[item.type]}
+                            type={item.type}
+                            position={[
+                                THREE.MathUtils.clamp(
+                                    (item.x - x0 - width / 2) / SCALE3D,
+                                    -width / (2 * SCALE3D),
+                                    width / (2 * SCALE3D)
+                                ),
+                                // use our lookup, fallback to DEFAULT_OFFSET
+                                floorOffsets[item.type] ?? DEFAULT_OFFSET,
+                                THREE.MathUtils.clamp(
+                                    -(item.y - y0 - depth / 2) / SCALE3D,
+                                    -depth / (2 * SCALE3D),
+                                    depth / (2 * SCALE3D)
+                                )
+                            ]}
+                            rotation={item.rotation}
                         />
                     ))}
+
                     <ContactShadows position={[0,0.01,0]} opacity={0.7}
-                                    width={width/SCALE3D} height={depth/SCALE3D} blur={2} far={maxDim3}/>
+                                    width={width/SCALE3D} height={depth/SCALE3D} blur={2} far={max3}/>
                     <OrbitControls makeDefault/>
                 </Canvas>
             )}
@@ -300,7 +315,7 @@ const styles = {
     tintLabel:    { marginRight:8, color:'#555' },
     colorInput:   { width:32,height:32,border:'none',cursor:'pointer' },
     resetButton:  { marginLeft:12,padding:'6px 12px',background:'#c0392b',color:'#fff',border:'none',borderRadius:4,cursor:'pointer' },
-    sizeControls: { marginTop:12, textAlign:'center', display:'flex', justifyContent:'space-between', gap:'8px' },
+    sizeControls: { marginTop:12, textAlign:'center', display:'flex', gap:8, justifyContent:'space-between' },
     palette:      { position:'absolute', top:70,left:20,zIndex:2, background:'#fff', padding:12, borderRadius:8, boxShadow:'0 4px 12px rgba(0,0,0,0.1)' },
     iconBtn:      { display:'block', marginBottom:8, padding:'6px 12px', background:'#2980b9', color:'#fff', border:'none',borderRadius:4,cursor:'pointer',width:'100%' },
     fullStage:    { position:'absolute', top:0,left:0, background:'#fff' },
