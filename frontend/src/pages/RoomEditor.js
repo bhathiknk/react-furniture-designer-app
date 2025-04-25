@@ -100,13 +100,25 @@ function Furniture3D({ modelUrl, type, position, rotation }) {
     return <primitive object={obj} position={position} />;
 }
 
-// floor + walls
+// floor + walls with real thickness & PBR materials
 function RoomBox({ width, depth, height, textures, openSide, wallTint }) {
     const [floorMap, wallMap] = useTexture([textures.floor, textures.wall]);
+
+    // repeat textures
     floorMap.wrapS = floorMap.wrapT = THREE.RepeatWrapping;
     floorMap.repeat.set(width/SCALE3D, depth/SCALE3D);
     wallMap.wrapS = wallMap.wrapT = THREE.RepeatWrapping;
     wallMap.repeat.set(width/SCALE3D, height/SCALE3D);
+
+    const floorThickness = 0.1;
+    const wallThickness  = 0.08;
+
+    const normals = {
+        back:  [ 0, 0, -1 ],
+        front: [ 0, 0,  1 ],
+        left:  [ -1, 0, 0 ],
+        right: [ 1,  0, 0 ]
+    };
 
     const walls = [
         { name:'back',  rot:[0,0,0],         pos:[0, height/(2*SCALE3D), -depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
@@ -117,19 +129,48 @@ function RoomBox({ width, depth, height, textures, openSide, wallTint }) {
 
     return (
         <group>
-            <mesh rotation={[-Math.PI/2,0,0]} receiveShadow>
-                <planeGeometry args={[width/SCALE3D, depth/SCALE3D]} />
-                <meshStandardMaterial map={floorMap} />
+            {/* Thick floor (flat, lifted by half its thickness) */}
+            <mesh
+                position={[0, floorThickness/2, 0]}
+                receiveShadow
+                castShadow
+            >
+                <boxGeometry args={[ width/SCALE3D, floorThickness, depth/SCALE3D ]} />
+                <meshStandardMaterial
+                    map={floorMap}
+                    roughness={0.8}
+                    metalness={0.2}
+                />
             </mesh>
-            {walls.filter(w=>w.name!==openSide).map((w,i)=>(
-                <mesh key={i} rotation={w.rot} position={w.pos} castShadow>
-                    <planeGeometry args={w.size} />
-                    <meshStandardMaterial
-                        side={THREE.DoubleSide}
-                        map={wallMap}
-                        color={wallTint||'#ffffff'} />
-                </mesh>
-            ))}
+
+            {/* Thick walls */}
+            {walls.filter(w => w.name !== openSide).map((w,i) => {
+                const [nx, , nz] = normals[w.name];
+                const offsetPos = [
+                    w.pos[0] + nx * wallThickness/2,
+                    w.pos[1],
+                    w.pos[2] + nz * wallThickness/2
+                ];
+
+                return (
+                    <mesh
+                        key={i}
+                        rotation={w.rot}
+                        position={offsetPos}
+                        receiveShadow
+                        castShadow
+                    >
+                        <boxGeometry args={[ w.size[0], w.size[1], wallThickness ]} />
+                        <meshStandardMaterial
+                            map={wallMap}
+                            color={wallTint||'#ffffff'}
+                            roughness={0.9}
+                            metalness={0.1}
+                            side={THREE.DoubleSide}
+                        />
+                    </mesh>
+                );
+            })}
         </group>
     );
 }
@@ -152,9 +193,7 @@ export default function RoomEditor() {
         return (
             <div style={styles.fallback}>
                 <p style={styles.fallbackText}>Unknown room type.</p>
-                <button style={styles.backButton} onClick={()=>nav('/dashboard')}>
-                    ← Back
-                </button>
+                <button style={styles.backButton} onClick={()=>nav('/dashboard')}>← Back</button>
             </div>
         );
     }
@@ -249,64 +288,43 @@ export default function RoomEditor() {
                 </div>
             )}
 
-            {view==='2D'
-                ? <Stage width={vw} height={vh} style={styles.fullStage}>
+            {view==='2D' ? (
+                <Stage width={vw} height={vh} style={styles.fullStage}>
                     <Layer>
-                        <Rect
-                            x={x0} y={y0}
-                            width={width}
-                            height={depth}
-                            fill="#fafafa"
-                            stroke={wallTint||'#2980b9'}
-                            strokeWidth={4}
-                            cornerRadius={6}
-                        />
-
+                        <Rect x={x0} y={y0} width={width} height={depth}
+                              fill="#fafafa" stroke={wallTint||'#2980b9'} strokeWidth={4} cornerRadius={6}/>
                         {furniture.map(item=>(
-                            <Group
-                                key={item.id}
-                                x={item.x}
-                                y={item.y}
-                                offset={{ x:item.size/2, y:item.size/2 }}
-                                rotation={item.rotation}
-                                draggable
-                                onClick={()=>setSelected(item.id)}
-                                onDragMove={e=>setFurniture(fs=>
-                                    fs.map(f=>
-                                        f.id===item.id
-                                            ? { ...f, x:e.target.x(), y:e.target.y() }
-                                            : f
-                                    )
-                                )}
-                            >
-                                <Rect
-                                    width={item.size}
-                                    height={item.size}
-                                    fill={item.id===selectedId
-                                        ? 'rgba(41,128,185,0.4)'
-                                        : 'rgba(0,0,0,0.2)'}
-                                />
-
-                                {/* Arrow points DOWN by default */}
+                            <Group key={item.id}
+                                   x={item.x} y={item.y}
+                                   offset={{ x:item.size/2, y:item.size/2 }}
+                                   rotation={item.rotation}
+                                   draggable
+                                   onClick={()=>setSelected(item.id)}
+                                   onDragMove={e=>setFurniture(fs=>
+                                       fs.map(f=>f.id===item.id
+                                           ? { ...f, x:e.target.x(), y:e.target.y() } : f
+                                       )
+                                   )}>
+                                <Rect width={item.size} height={item.size}
+                                      fill={item.id===selectedId?'rgba(41,128,185,0.4)':'rgba(0,0,0,0.2)'}/>
                                 <Arrow
                                     points={[0, item.size/2, 0, item.size]}
                                     pointerLength={10}
                                     pointerWidth={10}
                                     fill="#e74c3c"
                                     stroke="#e74c3c"
-                                    rotation={-defaultRotations[item.type] || 0}
+                                    rotation={-defaultRotations[item.type]||0}
                                 />
-
                             </Group>
                         ))}
-
                         <Text text={`${width}px`}  x={x0+width/2-20} y={y0-24} fontSize={16} fill="#2c3e50"/>
                         <Text text={`${depth}px`}  x={x0+width+8}  y={y0+depth/2-8} fontSize={16} fill="#2c3e50"/>
                         <Line points={[x0-30,y0, x0-30,y0+height]} stroke="#2c3e50" strokeWidth={2}/>
                         <Text text={`${height}px`} x={x0-60} y={y0+height/2-8} fontSize={16} fill="#2c3e50"/>
                     </Layer>
                 </Stage>
-                : <Canvas shadows camera={{position:[0,camY,camZ],fov:60}} style={styles.canvas}>
+            ) : (
+                <Canvas shadows camera={{position:[0,camY,camZ],fov:60}} style={styles.canvas}>
                     <ambientLight intensity={0.5}/>
                     <directionalLight castShadow position={[5,10,5]} intensity={1}
                                       shadow-mapSize-width={1024} shadow-mapSize-height={1024}
@@ -316,7 +334,6 @@ export default function RoomEditor() {
                     <Environment preset="sunset" background={false}/>
                     <RoomBox width={width} depth={depth} height={height}
                              textures={textures} openSide="front" wallTint={wallTint}/>
-
                     {furniture.map(item=>{
                         const x3 = THREE.MathUtils.clamp(
                             (item.x - x0 - width/2)/SCALE3D,
@@ -328,35 +345,28 @@ export default function RoomEditor() {
                             -depth/(2*SCALE3D),
                             depth/(2*SCALE3D)
                         );
-                        // **invert** the 2D rotation for 3D so right → right
                         const yaw = -item.rotation;
                         return (
                             <Furniture3D
                                 key={item.id}
                                 modelUrl={furnitureModels[item.type]}
                                 type={item.type}
-                                position={[
-                                    x3,
-                                    floorOffsets[item.type] ?? DEFAULT_OFFSET,
-                                    z3
-                                ]}
+                                position={[ x3, floorOffsets[item.type] ?? DEFAULT_OFFSET, z3 ]}
                                 rotation={yaw}
                             />
                         );
                     })}
-
                     <ContactShadows position={[0,0.01,0]} opacity={0.7}
                                     width={width/SCALE3D} height={depth/SCALE3D} blur={2} far={max3}/>
                     <OrbitControls makeDefault/>
                 </Canvas>
-            }
-
+            )}
             <button style={styles.backCorner} onClick={()=>nav('/dashboard')}>← Dashboard</button>
         </div>
     );
 }
 
-// Dimension control component
+// Dimension control component (unchanged)
 function DimensionControl({ label, value, onChange, min, max, step }) {
     return (
         <div style={styles.controlRow}>
