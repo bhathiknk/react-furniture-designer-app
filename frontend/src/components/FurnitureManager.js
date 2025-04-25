@@ -15,7 +15,7 @@ export const furnitureScales = {
     bed:          1,
     table:        0.09,
     lamp:         0.009,
-    wardrobe:     1,
+    wardrobe:     0.6,
     bookshelf:    0.006,
     coffee_table: 0.006,
     desk:         1,
@@ -77,7 +77,7 @@ export const floorOffsets = {
     bed:           0.01,
     table:         0.01,
     lamp:          1.8,
-    wardrobe:      1.5,
+    wardrobe:      0.2,
     bookshelf:     0.1,
     coffee_table:  0.01,
     desk:          0.01,
@@ -89,15 +89,25 @@ export const DEFAULT_OFFSET = 0.01;
  * 3D furniture component.
  * Accepts an optional `color` prop (hex string) to recolor the entire model.
  */
-export function Furniture3D({ modelUrl, type, position, rotation, color }) {
+export function Furniture3D({ modelUrl, type, position, rotation, color, size }) {
     const { scene } = useGLTF(modelUrl);
     const obj = React.useMemo(() => {
         const cloned = scene.clone();
-        const s = furnitureScales[type] || 0.003;
+
+        // base 3D scale from static table
+        const baseScale = furnitureScales[type] ?? 0.003;
+
+        // if a size (px) is passed in, re-scale proportionally
+        let s = baseScale;
+        if (size != null) {
+            const defaultIconPx = getIconSize(type).iconW;
+            s = baseScale * (size / defaultIconPx);
+        }
+
         cloned.scale.set(s, s, s);
         cloned.rotation.y = THREE.MathUtils.degToRad(rotation);
+
         if (color) {
-            // traverse and apply color
             cloned.traverse(child => {
                 if (child.isMesh && child.material) {
                     const mat = child.material.clone();
@@ -106,7 +116,9 @@ export function Furniture3D({ modelUrl, type, position, rotation, color }) {
                 }
             });
         }
+
         return cloned;
-    }, [scene, type, rotation, color]);
+    }, [scene, type, rotation, color, size]);
+
     return <primitive object={obj} position={position} />;
 }
