@@ -29,7 +29,7 @@ const furnitureScales = {
     dining_chair: 0.9
 };
 
-// Ten furniture GLB model URLs under public/models/furniture/
+// furniture model URLs
 const furnitureModels = {
     chair:        '/models/furniture/chair.glb',
     sofa:         '/models/furniture/sofa.glb',
@@ -54,12 +54,12 @@ const roomDefinitions = {
 };
 
 // 3D furniture component
-function Furniture3D({ modelUrl, type, position }) {
+function Furniture3D({ modelUrl, type, position, rotation }) {
     const { scene } = useGLTF(modelUrl);
     const obj = scene.clone();
-    // pick scale from our lookup
     const s = furnitureScales[type] || 0.003;
     obj.scale.set(s, s, s);
+    obj.rotation.y = THREE.MathUtils.degToRad(rotation);
     return <primitive object={obj} position={position} />;
 }
 
@@ -67,15 +67,15 @@ function Furniture3D({ modelUrl, type, position }) {
 function RoomBox({ width, depth, height, textures, openSide, wallTint }) {
     const [floorMap, wallMap] = useTexture([textures.floor, textures.wall]);
     floorMap.wrapS = floorMap.wrapT = THREE.RepeatWrapping;
-    floorMap.repeat.set(width / SCALE3D, depth / SCALE3D);
-    wallMap.wrapS  = wallMap.wrapT  = THREE.RepeatWrapping;
-    wallMap.repeat.set(width / SCALE3D, height / SCALE3D);
+    floorMap.repeat.set(width/SCALE3D, depth/SCALE3D);
+    wallMap.wrapS = wallMap.wrapT = THREE.RepeatWrapping;
+    wallMap.repeat.set(width/SCALE3D, height/SCALE3D);
 
     const walls = [
-        { name:'back',  rot:[0,0,0],         pos:[0,  height/(2*SCALE3D), -depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
-        { name:'front', rot:[0,Math.PI,0],   pos:[0,  height/(2*SCALE3D),  depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
-        { name:'left',  rot:[0,Math.PI/2,0], pos:[-width/(2*SCALE3D), height/(2*SCALE3D), 0],   size:[depth/SCALE3D, height/SCALE3D] },
-        { name:'right', rot:[0,-Math.PI/2,0],pos:[ width/(2*SCALE3D), height/(2*SCALE3D), 0],   size:[depth/SCALE3D, height/SCALE3D] }
+        { name:'back',  rot:[0,0,0],        pos:[0, height/(2*SCALE3D), -depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
+        { name:'front', rot:[0,Math.PI,0],  pos:[0, height/(2*SCALE3D),  depth/(2*SCALE3D)], size:[width/SCALE3D, height/SCALE3D] },
+        { name:'left',  rot:[0,Math.PI/2,0],pos:[-width/(2*SCALE3D), height/(2*SCALE3D), 0],  size:[depth/SCALE3D, height/SCALE3D] },
+        { name:'right', rot:[0,-Math.PI/2,0],pos:[ width/(2*SCALE3D), height/(2*SCALE3D),0],  size:[depth/SCALE3D, height/SCALE3D] }
     ];
 
     return (
@@ -84,7 +84,7 @@ function RoomBox({ width, depth, height, textures, openSide, wallTint }) {
                 <planeGeometry args={[width/SCALE3D, depth/SCALE3D]} />
                 <meshStandardMaterial map={floorMap} />
             </mesh>
-            {walls.filter(w => w.name !== openSide).map((w,i)=>(
+            {walls.filter(w=>w.name!==openSide).map((w,i)=>(
                 <mesh key={i} rotation={w.rot} position={w.pos} castShadow>
                     <planeGeometry args={w.size}/>
                     <meshStandardMaterial side={THREE.DoubleSide} map={wallMap} color={wallTint||'#ffffff'} />
@@ -129,7 +129,7 @@ export default function RoomEditor() {
     const addFurniture = type => {
         setFurniture(f => [
             ...f,
-            { id: Date.now(), type, x: x0 + width/2, y: y0 + depth/2, size: 40 }
+            { id:Date.now(), type, x:x0+width/2, y:y0+depth/2, size:40, rotation:0 }
         ]);
         setSelected(null);
     };
@@ -145,6 +145,17 @@ export default function RoomEditor() {
         );
     };
 
+    // rotate selected
+    const rotateSelected = delta => {
+        setFurniture(fs =>
+            fs.map(i =>
+                i.id===selectedFurnitureId
+                    ? { ...i, rotation: (i.rotation + delta + 360) % 360 }
+                    : i
+            )
+        );
+    };
+
     return (
         <div style={styles.container}>
             {/* Tabs */}
@@ -152,12 +163,13 @@ export default function RoomEditor() {
                 {['2D','3D'].map(tab=>(
                     <button key={tab}
                             onClick={()=>setView(tab)}
-                            style={{...styles.tab, ...(view===tab?styles.activeTab:{})}}
-                    >{tab} View</button>
+                            style={{...styles.tab, ...(view===tab?styles.activeTab:{})}}>
+                        {tab} View
+                    </button>
                 ))}
             </div>
 
-            {/* Palette */}
+            {/* Furniture Palette */}
             {view==='2D' && (
                 <div style={styles.palette}>
                     {Object.keys(furnitureModels).map(type=>(
@@ -168,7 +180,7 @@ export default function RoomEditor() {
                 </div>
             )}
 
-            {/* Controls + resize */}
+            {/* Controls + resize/rotate */}
             {view==='2D' && (
                 <div style={styles.controls}>
                     <h4 style={styles.controlHeader}>Room Settings</h4>
@@ -184,30 +196,35 @@ export default function RoomEditor() {
                         <div style={styles.sizeControls}>
                             <button onClick={()=>resizeSelected(+10)}>Increase Size</button>
                             <button onClick={()=>resizeSelected(-10)}>Decrease Size</button>
+                            <button onClick={()=>rotateSelected(+15)}>Rotate +15°</button>
+                            <button onClick={()=>rotateSelected(-15)}>Rotate -15°</button>
                         </div>
                     )}
                 </div>
             )}
 
-            {/* Main */}
+            {/* Main Content */}
             {view==='2D' ? (
                 <Stage width={vw} height={vh} style={styles.fullStage}>
                     <Layer>
                         <Rect x={x0} y={y0} width={width} height={depth}
                               fill="#fafafa" stroke={wallTint||'#2980b9'} strokeWidth={4} cornerRadius={6}/>
                         {furniture.map(item=>(
-                            <Rect key={item.id}
-                                  x={item.x} y={item.y}
-                                  width={item.size} height={item.size}
-                                  fill={ item.id===selectedFurnitureId ? 'rgba(41,128,185,0.4)' : 'rgba(0,0,0,0.2)' }
-                                  draggable
-                                  onClick={()=>setSelected(item.id)}
-                                  onDragEnd={e=>setFurniture(fs =>
-                                      fs.map(f=> f.id===item.id
-                                          ? { ...f, x:e.target.x(), y:e.target.y() }
-                                          : f
-                                      )
-                                  )}
+                            <Rect
+                                key={item.id}
+                                x={item.x} y={item.y}
+                                width={item.size} height={item.size}
+                                offset={{ x:item.size/2, y:item.size/2 }}
+                                rotation={item.rotation}
+                                fill={ item.id===selectedFurnitureId ? 'rgba(41,128,185,0.4)' : 'rgba(0,0,0,0.2)' }
+                                draggable
+                                onClick={()=>setSelected(item.id)}
+                                onDragMove={e=>setFurniture(fs =>
+                                    fs.map(f=> f.id===item.id
+                                        ? { ...f, x:e.target.x(), y:e.target.y() }
+                                        : f
+                                    )
+                                )}
                             />
                         ))}
                         <Text text={`${width}px`} x={x0+width/2-20} y={y0-24} fontSize={16} fill="#2c3e50"/>
@@ -234,19 +251,16 @@ export default function RoomEditor() {
                                      type={item.type}
                                      position={[
                                          THREE.MathUtils.clamp((item.x - x0 - width/2)/SCALE3D, -width/(2*SCALE3D), width/(2*SCALE3D)),
-                                         // lamp sits taller, wardrobe sits a bit higher
+                                         // lift lamp & wardrobe so they rest on floor
                                          item.type==='lamp'     ? 1.8 :
-                                             item.type==='wardrobe'? 1.5 :
-                                                 item.type==='coffee_table'? 0.1 :
-                                                     item.type==='dining_chair'? 0.9 :
-                                                         0.01,
+                                             item.type==='wardrobe'? 1.5 : 0.01,
                                          THREE.MathUtils.clamp(-(item.y - y0 - depth/2)/SCALE3D, -depth/(2*SCALE3D), depth/(2*SCALE3D))
                                      ]}
+                                     rotation={item.rotation}
                         />
                     ))}
                     <ContactShadows position={[0,0.01,0]} opacity={0.7}
-                                    width={width/SCALE3D} height={depth/SCALE3D}
-                                    blur={2} far={maxDim3}/>
+                                    width={width/SCALE3D} height={depth/SCALE3D} blur={2} far={maxDim3}/>
                     <OrbitControls makeDefault/>
                 </Canvas>
             )}
@@ -286,7 +300,7 @@ const styles = {
     tintLabel:    { marginRight:8, color:'#555' },
     colorInput:   { width:32,height:32,border:'none',cursor:'pointer' },
     resetButton:  { marginLeft:12,padding:'6px 12px',background:'#c0392b',color:'#fff',border:'none',borderRadius:4,cursor:'pointer' },
-    sizeControls: { marginTop:12, textAlign:'center' },
+    sizeControls: { marginTop:12, textAlign:'center', display:'flex', justifyContent:'space-between', gap:'8px' },
     palette:      { position:'absolute', top:70,left:20,zIndex:2, background:'#fff', padding:12, borderRadius:8, boxShadow:'0 4px 12px rgba(0,0,0,0.1)' },
     iconBtn:      { display:'block', marginBottom:8, padding:'6px 12px', background:'#2980b9', color:'#fff', border:'none',borderRadius:4,cursor:'pointer',width:'100%' },
     fullStage:    { position:'absolute', top:0,left:0, background:'#fff' },
