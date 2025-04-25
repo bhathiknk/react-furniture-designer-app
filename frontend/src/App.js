@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Login     from './pages/Login';
 import Register  from './pages/Register';
-import Viewer3D  from './pages/Viewer3D'; // create this
+import Viewer3D  from './pages/RoomEditor'; // create this
 
 export default function App() {
     return (
