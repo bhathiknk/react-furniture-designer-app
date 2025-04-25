@@ -70,7 +70,7 @@ const DEFAULT_OFFSET = 0.01;
 const defaultRotations = {
     chair:        0,
     sofa:         0,
-    bed:          270,
+    bed:          90,
     table:        0,
     lamp:         0,
     wardrobe:     180,
@@ -228,12 +228,14 @@ export default function RoomEditor() {
             {view==='2D' && (
                 <div style={styles.controls}>
                     <h4 style={styles.controlHeader}>Room Settings</h4>
-                    <DimensionControl label="Width(px)" value={width} onChange={setWidth} min={10} max={vw} step={1}/>
-                    <DimensionControl label="Depth(px)" value={depth} onChange={setDepth} min={10} max={vh} step={1}/>
+                    <DimensionControl label="Width(px)"  value={width}  onChange={setWidth}  min={10} max={vw} step={1}/>
+                    <DimensionControl label="Depth(px)"  value={depth}  onChange={setDepth}  min={10} max={vh} step={1}/>
                     <DimensionControl label="Height(px)" value={height} onChange={setHeight} min={10} max={vh} step={1}/>
                     <div style={styles.tintGroup}>
                         <label style={styles.tintLabel}>Wall Tint:</label>
-                        <input type="color" value={wallTint} onChange={e=>setWallTint(e.target.value)} style={styles.colorInput}/>
+                        <input type="color" value={wallTint}
+                               onChange={e=>setWallTint(e.target.value)}
+                               style={styles.colorInput}/>
                         <button onClick={()=>setWallTint('')} style={styles.resetButton}>Reset</button>
                     </div>
                     {selectedId && (
@@ -250,8 +252,16 @@ export default function RoomEditor() {
             {view==='2D'
                 ? <Stage width={vw} height={vh} style={styles.fullStage}>
                     <Layer>
-                        <Rect x={x0} y={y0} width={width} height={depth}
-                              fill="#fafafa" stroke={wallTint||'#2980b9'} strokeWidth={4} cornerRadius={6}/>
+                        <Rect
+                            x={x0} y={y0}
+                            width={width}
+                            height={depth}
+                            fill="#fafafa"
+                            stroke={wallTint||'#2980b9'}
+                            strokeWidth={4}
+                            cornerRadius={6}
+                        />
+
                         {furniture.map(item=>(
                             <Group
                                 key={item.id}
@@ -269,17 +279,27 @@ export default function RoomEditor() {
                                     )
                                 )}
                             >
-                                <Rect width={item.size} height={item.size}
-                                      fill={item.id===selectedId ? 'rgba(41,128,185,0.4)' : 'rgba(0,0,0,0.2)'}/>
+                                <Rect
+                                    width={item.size}
+                                    height={item.size}
+                                    fill={item.id===selectedId
+                                        ? 'rgba(41,128,185,0.4)'
+                                        : 'rgba(0,0,0,0.2)'}
+                                />
+
+                                {/* Arrow points DOWN by default */}
                                 <Arrow
-                                    points={[0, -item.size/2, 0, -item.size]}
+                                    points={[0, item.size/2, 0, item.size]}
                                     pointerLength={10}
                                     pointerWidth={10}
                                     fill="#e74c3c"
                                     stroke="#e74c3c"
+                                    rotation={-defaultRotations[item.type] || 0}
                                 />
+
                             </Group>
                         ))}
+
                         <Text text={`${width}px`}  x={x0+width/2-20} y={y0-24} fontSize={16} fill="#2c3e50"/>
                         <Text text={`${depth}px`}  x={x0+width+8}  y={y0+depth/2-8} fontSize={16} fill="#2c3e50"/>
                         <Line points={[x0-30,y0, x0-30,y0+height]} stroke="#2c3e50" strokeWidth={2}/>
@@ -296,6 +316,7 @@ export default function RoomEditor() {
                     <Environment preset="sunset" background={false}/>
                     <RoomBox width={width} depth={depth} height={height}
                              textures={textures} openSide="front" wallTint={wallTint}/>
+
                     {furniture.map(item=>{
                         const x3 = THREE.MathUtils.clamp(
                             (item.x - x0 - width/2)/SCALE3D,
@@ -307,6 +328,8 @@ export default function RoomEditor() {
                             -depth/(2*SCALE3D),
                             depth/(2*SCALE3D)
                         );
+                        // **invert** the 2D rotation for 3D so right → right
+                        const yaw = -item.rotation;
                         return (
                             <Furniture3D
                                 key={item.id}
@@ -315,12 +338,13 @@ export default function RoomEditor() {
                                 position={[
                                     x3,
                                     floorOffsets[item.type] ?? DEFAULT_OFFSET,
-                                    z3      // direct mapping so 2D back = negative, 2D front = positive
+                                    z3
                                 ]}
-                                rotation={item.rotation}
+                                rotation={yaw}
                             />
                         );
                     })}
+
                     <ContactShadows position={[0,0.01,0]} opacity={0.7}
                                     width={width/SCALE3D} height={depth/SCALE3D} blur={2} far={max3}/>
                     <OrbitControls makeDefault/>
@@ -332,7 +356,7 @@ export default function RoomEditor() {
     );
 }
 
-// controls & styles (unchanged)…
+// Dimension control component
 function DimensionControl({ label, value, onChange, min, max, step }) {
     return (
         <div style={styles.controlRow}>
