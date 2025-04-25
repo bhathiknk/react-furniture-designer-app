@@ -7,16 +7,19 @@ export default function Room2DView({
                                        setWidth, setDepth, setHeight,
                                        furniture, selectedId, setFurniture, setSelected,
                                        addFurniture, resizeSel, rotateSel, changeColor, deleteSel,
-                                       wallTint, setWallTint
+                                       wallTint, setWallTint,
+                                       onSave      // ← new prop
                                    }) {
     return (
         <>
             {/* Palette */}
             <div style={styles.palette}>
                 {Object.keys(furnitureModels).map(type=>(
-                    <button key={type}
-                            style={styles.iconBtn}
-                            onClick={()=>addFurniture(type)}>
+                    <button
+                        key={type}
+                        style={styles.iconBtn}
+                        onClick={()=>addFurniture(type)}
+                    >
                         {type.replace('_',' ')}
                     </button>
                 ))}
@@ -38,16 +41,14 @@ export default function Room2DView({
                             <label style={styles.dimLabel}>{label} (px):</label>
                             <input
                                 type="number"
-                                min={10}
-                                max={max}
+                                min={10} max={max}
                                 value={value}
                                 onChange={e=>setter(Number(e.target.value)||10)}
                                 style={styles.dimInput}
                             />
                             <input
                                 type="range"
-                                min={10}
-                                max={max}
+                                min={10} max={max}
                                 value={value}
                                 onChange={e=>setter(Number(e.target.value))}
                                 style={styles.dimSlider}
@@ -87,10 +88,15 @@ export default function Room2DView({
                                 style={styles.colorInputLarge}
                             />
                         </div>
-                        <button style={styles.deleteBtn} onClick={deleteSel}>
-                            🗑️ Delete
-                        </button>
+                        <button style={styles.deleteBtn} onClick={deleteSel}>🗑️ Delete</button>
                     </div>
+                </div>
+
+                {/* Save Design */}
+                <div style={styles.section}>
+                    <button style={styles.saveBtn} onClick={onSave}>
+                        💾 Save Design
+                    </button>
                 </div>
             </div>
 
@@ -131,7 +137,6 @@ export default function Room2DView({
                                )}>
                             <Rect
                                 width={item.iconW} height={item.iconH}
-                                // default grey if no user color:
                                 fill={item.color ?? '#cccccc'}
                                 stroke={item.id===selectedId ? '#ff4444' : '#333333'}
                                 strokeWidth={item.id===selectedId ? 4 : 2}
@@ -201,6 +206,17 @@ const styles = {
         borderRadius:6,
         cursor:'pointer',
         fontSize:14,
+        fontWeight:600
+    },
+    saveBtn:         {
+        width:'100%',
+        padding:'10px 0',
+        background:'linear-gradient(135deg,#4caf50,#388e3c)',
+        color:'#fff',
+        border:'none',
+        borderRadius:6,
+        cursor:'pointer',
+        fontSize:16,
         fontWeight:600
     }
 };
