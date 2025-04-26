@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import API from '../utils/api';
+import Swal from 'sweetalert2';
 
 import Room2DView from '../components/Room2DView';
 import Room3DView from '../components/Room3DView';
@@ -26,13 +27,11 @@ export default function RoomEditor() {
     const { search }  = useLocation();
     const designId    = new URLSearchParams(search).get('design');
 
-    // pick room definition
     const defOrig   = roomDefinitions[roomKey];
     const roomDef   = defOrig || roomDefinitions['living'];
     const def       = roomDef.default;
     const textures  = roomDef.textures;
 
-    // state
     const [view,      setView]      = useState('2D');
     const [width,     setWidth]     = useState(def.width);
     const [depth,     setDepth]     = useState(def.depth);
@@ -41,7 +40,7 @@ export default function RoomEditor() {
     const [furniture, setFurniture] = useState([]);
     const [selected,  setSelected]  = useState(null);
 
-    // load existing design if editing
+    // load existing
     useEffect(() => {
         if (!designId) return;
         API.get(`/designs/${designId}`)
@@ -62,7 +61,7 @@ export default function RoomEditor() {
             .catch(console.error);
     }, [designId]);
 
-    // save new design
+    // save new
     const saveDesign = () => {
         const x0 = (window.innerWidth  - width) / 2;
         const y0 = (window.innerHeight - depth) / 2;
@@ -72,8 +71,13 @@ export default function RoomEditor() {
             y: i.y - y0
         }));
         API.post('/designs', { roomKey, width, depth, height, wallTint, furniture: rel })
-            .then(() => { alert('Design saved!'); nav('/dashboard'); })
-            .catch(err => { console.error(err); alert('Save failed'); });
+            .then(() => {
+                Swal.fire('Saved!', 'Your design has been saved.', 'success')
+                    .then(() => nav('/dashboard'));
+            })
+            .catch(() => {
+                Swal.fire('Error', 'Failed to save design.', 'error');
+            });
     };
 
     // update existing
@@ -86,11 +90,27 @@ export default function RoomEditor() {
             y: i.y - y0
         }));
         API.put(`/designs/${designId}`, { roomKey, width, depth, height, wallTint, furniture: rel })
-            .then(() => { alert('Design updated!'); nav('/dashboard'); })
-            .catch(err => { console.error(err); alert('Update failed'); });
+            .then(() => {
+                Swal.fire('Updated!', 'Design updated successfully.', 'success')
+                    .then(() => nav('/dashboard'));
+            })
+            .catch(() => {
+                Swal.fire('Error', 'Failed to update design.', 'error');
+            });
     };
 
-    // fallback for unknown rooms
+    // delete design
+    const deleteDesign = () => {
+        API.delete(`/designs/${designId}`)
+            .then(() => {
+                Swal.fire('Deleted!', 'Design has been deleted.', 'success')
+                    .then(() => nav('/dashboard'));
+            })
+            .catch(() => {
+                Swal.fire('Error', 'Failed to delete design.', 'error');
+            });
+    };
+
     if (!defOrig && view === '2D') {
         return (
             <div style={styles.fallback}>
@@ -100,12 +120,11 @@ export default function RoomEditor() {
         );
     }
 
-    // compute canvas offset
     const vw = window.innerWidth, vh = window.innerHeight;
     const x0 = (vw - width) / 2, y0 = (vh - depth) / 2;
 
     // furniture handlers
-    const addFurniture  = type => {
+    const addFurniture = type => {
         const { iconW, iconH } = getIconSize(type);
         setFurniture(f => [
             ...f,
@@ -113,44 +132,48 @@ export default function RoomEditor() {
         ]);
         setSelected(null);
     };
-    const resizeSel    = d => setFurniture(f => f.map(i => i.id === selected ? { ...i, iconW: Math.max(10, i.iconW + d), iconH: Math.max(10, i.iconH + d) } : i));
-    const rotateSel    = d => setFurniture(f => f.map(i => i.id === selected ? { ...i, rotation: (i.rotation + d + 360) % 360 } : i));
-    const changeColor  = hex => setFurniture(f => f.map(i => i.id === selected ? { ...i, color: hex } : i));
-    const deleteSel    = () => { setFurniture(f => f.filter(i => i.id !== selected)); setSelected(null); };
+    const resizeSel   = d => setFurniture(f => f.map(i => i.id===selected ? {...i, iconW:Math.max(10,i.iconW+d), iconH:Math.max(10,i.iconH+d)} : i));
+    const rotateSel   = d => setFurniture(f => f.map(i => i.id===selected ? {...i, rotation:(i.rotation+d+360)%360} : i));
+    const changeColor = hex => setFurniture(f => f.map(i => i.id===selected ? {...i, color:hex} : i));
+    const deleteSel   = () => { setFurniture(f => f.filter(i=>i.id!==selected)); setSelected(null); };
 
     return (
         <div style={styles.container}>
-            {/* View toggle */}
+            {/* view toggle */}
             <div style={styles.tabs}>
                 {['2D','3D'].map(t => (
                     <button
                         key={t}
                         onClick={()=>setView(t)}
-                        style={{ ...styles.tab, ...(view === t ? styles.activeTab : {}) }}
+                        style={{ ...styles.tab, ...(view===t?styles.activeTab:{}) }}
                     >{t} View</button>
                 ))}
             </div>
 
-            {/* 2D or 3D */}
-            {view === '2D' ? (
+            {view==='2D' ? (
                 <Room2DView
-                    width={width}      setWidth={setWidth}
-                    depth={depth}      setDepth={setDepth}
-                    height={height}    setHeight={setHeight}
-                    x0={x0}            y0={y0}
+                    width={width} setWidth={setWidth}
+                    depth={depth} setDepth={setDepth}
+                    height={height} setHeight={setHeight}
+                    x0={x0} y0={y0}
+
                     furniture={furniture}
                     selectedId={selected}
                     setFurniture={setFurniture}
                     setSelected={setSelected}
+
                     addFurniture={addFurniture}
                     resizeSel={resizeSel}
                     rotateSel={rotateSel}
                     changeColor={changeColor}
                     deleteSel={deleteSel}
+
                     wallTint={wallTint}
                     setWallTint={setWallTint}
+
                     onSave={saveDesign}
                     onUpdate={updateDesign}
+                    onDelete={deleteDesign}
                     isEditing={!!designId}
                 />
             ) : (

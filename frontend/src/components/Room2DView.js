@@ -1,4 +1,5 @@
 import React from 'react';
+import Swal from 'sweetalert2';
 import { Stage, Layer, Rect, Text, Line, Arrow, Group } from 'react-konva';
 import { WALL_2D_THICKNESS, furnitureModels } from './FurnitureManager';
 
@@ -8,9 +9,10 @@ export default function Room2DView({
                                        furniture, selectedId, setFurniture, setSelected,
                                        addFurniture, resizeSel, rotateSel, changeColor, deleteSel,
                                        wallTint, setWallTint,
-                                       onSave,      // callback for new designs
-                                       onUpdate,    // callback for editing existing
-                                       isEditing    // boolean: true when editing an existing design
+                                       onSave,      // new prop
+                                       onUpdate,    // new prop
+                                       onDelete,    // new prop
+                                       isEditing    // new prop
                                    }) {
     return (
         <>
@@ -35,8 +37,8 @@ export default function Room2DView({
                 <div style={styles.section}>
                     <h4 style={styles.sectionHeader}>Room Size</h4>
                     {[
-                        { label: 'Width', value: width, setter: setWidth, max: window.innerWidth - 100 },
-                        { label: 'Depth', value: depth, setter: setDepth, max: window.innerHeight - 100 },
+                        { label: 'Width',  value: width,  setter: setWidth,  max: window.innerWidth - 100 },
+                        { label: 'Depth',  value: depth,  setter: setDepth,  max: window.innerHeight - 100 },
                         { label: 'Height', value: height, setter: setHeight, max: 1000 }
                     ].map(({ label, value, setter, max }) => (
                         <div key={label} style={styles.dimRow}>
@@ -90,11 +92,11 @@ export default function Room2DView({
                                 style={styles.colorInputLarge}
                             />
                         </div>
-                        <button style={styles.deleteBtn} onClick={deleteSel}>🗑️ Delete</button>
+                        <button style={styles.deleteBtn} onClick={deleteSel}>🗑️ Delete Item</button>
                     </div>
                 </div>
 
-                {/* Save or Update */}
+                {/* Save / Update */}
                 <div style={styles.section}>
                     {isEditing ? (
                         <button style={styles.updateBtn} onClick={onUpdate}>
@@ -106,6 +108,31 @@ export default function Room2DView({
                         </button>
                     )}
                 </div>
+
+                {/* Delete Design */}
+                {isEditing && (
+                    <div style={styles.section}>
+                        <button
+                            style={styles.deleteDesignBtn}
+                            onClick={async () => {
+                                const result = await Swal.fire({
+                                    title: 'Delete this design?',
+                                    text: 'This cannot be undone.',
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#e53935',
+                                    cancelButtonColor: '#aaa',
+                                    confirmButtonText: 'Yes, delete it!'
+                                });
+                                if (result.isConfirmed) {
+                                    onDelete();
+                                }
+                            }}
+                        >
+                            🗑️ Delete Design
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* 2D Canvas */}
@@ -120,29 +147,27 @@ export default function Room2DView({
                         strokeWidth={4}
                         cornerRadius={10}
                     />
-
                     {/* Walls */}
-                    <Rect x={x0} y={y0} width={width} height={WALL_2D_THICKNESS} fill="#b0b0b0" />
-                    <Rect x={x0} y={y0 + depth - WALL_2D_THICKNESS}
-                          width={width} height={WALL_2D_THICKNESS} fill="#b0b0b0" />
-                    <Rect x={x0} y={y0} width={WALL_2D_THICKNESS} height={depth} fill="#b0b0b0" />
-                    <Rect x={x0 + width - WALL_2D_THICKNESS} y={y0}
-                          width={WALL_2D_THICKNESS} height={depth} fill="#b0b0b0" />
+                    <Rect x={x0} y={y0} width={width} height={WALL_2D_THICKNESS} fill="#b0b0b0"/>
+                    <Rect x={x0} y={y0+depth-WALL_2D_THICKNESS}
+                          width={width} height={WALL_2D_THICKNESS} fill="#b0b0b0"/>
+                    <Rect x={x0} y={y0} width={WALL_2D_THICKNESS} height={depth} fill="#b0b0b0"/>
+                    <Rect x={x0+width-WALL_2D_THICKNESS} y={y0}
+                          width={WALL_2D_THICKNESS} height={depth} fill="#b0b0b0"/>
 
                     {/* Furniture */}
                     {furniture.map(item => (
                         <Group
                             key={item.id}
                             x={item.x} y={item.y}
-                            offset={{ x: item.iconW / 2, y: item.iconH / 2 }}
+                            offset={{ x: item.iconW/2, y: item.iconH/2 }}
                             rotation={item.rotation}
                             draggable
                             onClick={() => setSelected(item.id)}
                             onDragMove={e => setFurniture(fs =>
-                                fs.map(f =>
-                                    f.id === item.id
-                                        ? { ...f, x: e.target.x(), y: e.target.y() }
-                                        : f
+                                fs.map(f => f.id === item.id
+                                    ? { ...f, x: e.target.x(), y: e.target.y() }
+                                    : f
                                 )
                             )}
                         >
@@ -162,16 +187,15 @@ export default function Room2DView({
                     ))}
 
                     {/* Measurements */}
-                    <Text text={`${width}px`} x={x0 + width/2 - 25} y={y0 - 30} fontSize={14} fill="#444"/>
-                    <Text text={`${depth}px`} x={x0 + width + 12} y={y0 + depth/2 - 8} fontSize={14} fill="#444"/>
-                    <Line points={[x0 - 35, y0, x0 - 35, y0 + height]} stroke="#444" strokeWidth={2}/>
-                    <Text text={`${height}px`} x={x0 - 70} y={y0 + height/2 - 8} fontSize={14} fill="#444"/>
+                    <Text text={`${width}px`} x={x0+width/2-25} y={y0-30} fontSize={14} fill="#444"/>
+                    <Text text={`${depth}px`} x={x0+width+12} y={y0+depth/2-8} fontSize={14} fill="#444"/>
+                    <Line points={[x0-35,y0, x0-35,y0+height]} stroke="#444" strokeWidth={2}/>
+                    <Text text={`${height}px`} x={x0-70} y={y0+height/2-8} fontSize={14} fill="#444"/>
                 </Layer>
             </Stage>
         </>
     );
 }
-
 const styles = {
     stage:           { position:'absolute', top:0, left:0, background:'#eef3f8' },
     palette:         {
@@ -234,6 +258,12 @@ const styles = {
     updateBtn:       {
         width:'100%', padding:'10px 0',
         background:'linear-gradient(135deg,#2196f3,#1976d2)',
+        color:'#fff', border:'none', borderRadius:6,
+        cursor:'pointer', fontSize:16, fontWeight:600
+    },
+    deleteDesignBtn: {
+        width:'100%', padding:'10px 0',
+        background:'linear-gradient(135deg,#e53935,#c62828)',
         color:'#fff', border:'none', borderRadius:6,
         cursor:'pointer', fontSize:16, fontWeight:600
     }
