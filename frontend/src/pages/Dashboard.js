@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import API from '../utils/api';
 import { logout } from '../utils/auth';
-import { useNavigate } from 'react-router-dom';
 import Room3DView from '../components/Room3DView';
 import { furnitureModels } from '../components/FurnitureManager';
+import { FaEye } from 'react-icons/fa';
 
 const rooms = [
     { key:'living',  label:'Living Area'  },
@@ -29,20 +30,23 @@ const texturesMap = {
 export default function Dashboard() {
     const [user, setUser]       = useState(null);
     const [designs, setDesigns] = useState([]);
-    const nav = useNavigate();
+    const location = useLocation();
+    const nav      = useNavigate();
 
     useEffect(() => {
         API.get('/auth/me')
             .then(res => {
                 setUser(res.data.user);
-                Swal.fire({
-                    icon: 'success',
-                    title: `Welcome back, ${res.data.user.name}!`,
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 1500
-                });
+                if (location.state?.justLoggedIn) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: `Welcome back, ${res.data.user.name}!`,
+                        showConfirmButton: false,
+                        timer: 1500
+                    });
+                    // clear the flag so it doesn’t re-fire on refresh
+                    nav(location.pathname, { replace:true, state:{} });
+                }
             })
             .catch(() => {
                 logout();
@@ -52,15 +56,10 @@ export default function Dashboard() {
         API.get('/designs')
             .then(res => setDesigns(res.data.designs))
             .catch(() => {});
-    }, [nav]);
+    }, [nav, location]);
 
     return (
         <div style={styles.container}>
-            <style>{`
-        .room-card { transition: transform .3s, box-shadow .3s; }
-        .room-card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 12px 24px rgba(0,0,0,0.2); }
-      `}</style>
-
             <header style={styles.header}>
                 <div>
                     <h1 style={styles.welcome}>Welcome, {user?.name || 'User'}</h1>
@@ -85,7 +84,9 @@ export default function Dashboard() {
                         onClick={() => nav(`/viewer/${r.key}`)}
                     >
                         <div style={styles.imageWrapper}>
-                            <img src={`/rooms_images/${r.key}_room.png`} alt={r.label} style={styles.image}/>
+                            <img src={`/rooms_images/${r.key}_room.png`}
+                                 alt={r.label}
+                                 style={styles.image}/>
                         </div>
                         <div style={styles.labelBar}>
                             <h3 style={styles.label}>{r.label}</h3>
@@ -101,31 +102,31 @@ export default function Dashboard() {
             ) : (
                 <div style={styles.savedGrid}>
                     {designs.map(d => (
-                        <div
-                            key={d._id}
-                            className="room-card"
-                            style={styles.savedCard}
-                            onClick={() => nav(`/viewer/${d.roomKey}?design=${d._id}`)}
-                        >
+                        <div key={d._id} style={styles.savedCard}>
                             <div style={styles.thumbnail}>
                                 <Room3DView
-                                    width={d.width}
-                                    depth={d.depth}
-                                    height={d.height}
-                                    x0={0}
-                                    y0={0}
+                                    width={d.width} depth={d.depth} height={d.height}
+                                    x0={0} y0={0}
                                     furniture={d.furniture}
                                     textures={texturesMap[d.roomKey]}
                                     furnitureModels={furnitureModels}
                                     wallTint={d.wallTint}
+                                    // allow orbit & zoom on thumbnail
+                                    enableControls
                                 />
                             </div>
                             <div style={styles.savedLabelBar}>
                                 <h4 style={styles.savedLabel}>
-                                    {d.roomKey.charAt(0).toUpperCase() + d.roomKey.slice(1)}<br/>
+                                    {d.roomKey.charAt(0).toUpperCase()+d.roomKey.slice(1)}<br/>
                                     <small>{new Date(d.createdAt).toLocaleDateString()}</small>
                                 </h4>
                             </div>
+                            <button
+                                style={styles.viewBtn}
+                                onClick={() => nav(`/viewer/${d.roomKey}?design=${d._id}`)}
+                            >
+                                <FaEye size={18}/> View
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -158,16 +159,51 @@ const styles = {
     },
     title: { textAlign:'center', fontSize:'28px', fontWeight:600, margin:'0 0 8px', color:'#34495e' },
     separator: { width:100, height:4, background:'#34495e', margin:'0 auto 32px', borderRadius:2 },
-    grid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))', gap:'32px', marginBottom:'48px' },
-    card: { background:'#fff', borderRadius:12, overflow:'hidden', cursor:'pointer', display:'flex', flexDirection:'column', boxShadow:'0 6px 18px rgba(0,0,0,0.08)', height:'360px' },
+
+    grid: {
+        display:'grid',
+        gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',
+        gap:'32px', marginBottom:'48px'
+    },
+    card: {
+        background:'#fff', borderRadius:12, overflow:'hidden',
+        cursor:'pointer', display:'flex', flexDirection:'column',
+        boxShadow:'0 6px 18px rgba(0,0,0,0.08)', height:'360px'
+    },
     imageWrapper: { flex:'0 0 220px', overflow:'hidden' },
-    image: { width:'100%', height:'100%', objectFit:'cover' },
-    labelBar: { background:'#34495e', padding:12, textAlign:'center', flexGrow:1, display:'flex', alignItems:'center', justifyContent:'center' },
-    label: { margin:0, color:'#fff', fontSize:'20px', fontWeight:500 },
-    noDesigns: { textAlign:'center', color:'#666', marginBottom:'48px' },
-    savedGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:'24px', marginBottom:'48px' },
-    savedCard: { background:'#fff', borderRadius:8, overflow:'hidden', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.08)', display:'flex', flexDirection:'column', height:'200px' },
-    thumbnail: { width:'100%', height:'140px', overflow:'hidden' },
-    savedLabelBar: { background:'#52616b', flex:1, display:'flex', alignItems:'center', justifyContent:'center' },
-    savedLabel: { margin:0, color:'#fff', fontSize:'16px', fontWeight:500, lineHeight:1.2, textAlign:'center' }
+    image:        { width:'100%', height:'100%', objectFit:'cover' },
+    labelBar:     {
+        background:'#34495e', padding:12,
+        textAlign:'center', flexGrow:1,
+        display:'flex', alignItems:'center', justifyContent:'center'
+    },
+    label:        { margin:0, color:'#fff', fontSize:'20px', fontWeight:500 },
+
+    noDesigns:    { textAlign:'center', color:'#666', marginBottom:'48px' },
+
+    savedGrid:    {
+        display:'grid',
+        gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',
+        gap:'24px', marginBottom:'48px'
+    },
+    savedCard: {
+        position:'relative',
+        background:'#fff', borderRadius:8, overflow:'hidden',
+        boxShadow:'0 4px 12px rgba(0,0,0,0.08)',
+        display:'flex', flexDirection:'column', height:'240px'
+    },
+    thumbnail:      { flex:1, overflow:'hidden' },
+    savedLabelBar:  {
+        background:'#52616b', flexGrow:0,
+        padding:'8px', display:'flex',
+        alignItems:'center', justifyContent:'center'
+    },
+    savedLabel:    { margin:0, color:'#fff', fontSize:'14px', fontWeight:500, textAlign:'center' },
+    viewBtn:       {
+        position:'absolute', bottom:8, right:8,
+        background:'#357abd', color:'#fff',
+        border:'none', borderRadius:6,
+        padding:'6px 10px', cursor:'pointer',
+        display:'flex', alignItems:'center', gap:4
+    }
 };

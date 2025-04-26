@@ -15,7 +15,7 @@ const roomDefinitions = {
     living:  { default:{ width:600, depth:500, height:300 }, textures:{ floor:'/textures/wood_floor.jpg',      wall:'/textures/living_wall.jpg' } },
     kitchen: { default:{ width:400, depth:300, height:300 }, textures:{ floor:'/textures/tile_floor.jpg',      wall:'/textures/kitchen_wall.jpg' } },
     bed:     { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/carpet_floor.jpg',    wall:'/textures/bedroom_wall_.jpg' } },
-    office:  { default:{ width:400, depth:400, height:300 }, textures:{ floor:'/textures/laminate_floor.jpg',  wall:'/textures/office_wall.jpg' } },
+    office:  { default:{ width:400, depth:400, height:300 }, textures:{ floor:'/textures/office_floor.jpg',  wall:'/textures/office_wall.jpg' } },
     bath:    { default:{ width:300, depth:250, height:300 }, textures:{ floor:'/textures/bath_floor_tile.jpg', wall:'/textures/bathroom_wall.jpg' } },
     dining:  { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/wood_floor2.jpg',     wall:'/textures/dining_wall.jpg' } },
     study:   { default:{ width:400, depth:350, height:300 }, textures:{ floor:'/textures/laminate_floor2.jpg', wall:'/textures/study_wall.jpg' } }
