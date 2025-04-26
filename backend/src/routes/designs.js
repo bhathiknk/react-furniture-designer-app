@@ -1,16 +1,17 @@
-// src/routes/designs.js
 const express = require('express');
-const { saveDesign, getDesigns, getDesignById } = require('../controllers/designController');
 const { requireAuth } = require('../middleware/auth');
+const {
+    saveDesign,
+    getDesigns,
+    getDesignById,
+    updateDesign
+} = require('../controllers/designController');
+
 const router = express.Router();
 
-// Create a new design
 router.post('/',    requireAuth, saveDesign);
-
-// List all user's designs
 router.get('/',     requireAuth, getDesigns);
-
-// Fetch one design by its ID
 router.get('/:id',  requireAuth, getDesignById);
+router.put('/:id',  requireAuth, updateDesign);
 
 module.exports = router;

@@ -1,4 +1,3 @@
-// src/controllers/designController.js
 const Design = require('../models/Design');
 
 exports.saveDesign = async (req, res) => {
@@ -28,19 +27,32 @@ exports.getDesigns = async (req, res) => {
     }
 };
 
-// New: fetch single by ID
 exports.getDesignById = async (req, res) => {
     try {
         const design = await Design.findOne({
-            _id:    req.params.id,
-            user:   req.user._id
+            _id:  req.params.id,
+            user: req.user._id
         });
-        if (!design) {
-            return res.status(404).json({ error: 'Design not found' });
-        }
+        if (!design) return res.status(404).json({ error: 'Design not found' });
         res.json({ design });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Could not fetch design' });
+    }
+};
+
+exports.updateDesign = async (req, res) => {
+    try {
+        const { roomKey, width, depth, height, wallTint, furniture } = req.body;
+        const design = await Design.findOneAndUpdate(
+            { _id: req.params.id, user: req.user._id },
+            { roomKey, width, depth, height, wallTint, furniture },
+            { new: true }
+        );
+        if (!design) return res.status(404).json({ error: 'Design not found' });
+        res.json({ design });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not update design' });
     }
 };

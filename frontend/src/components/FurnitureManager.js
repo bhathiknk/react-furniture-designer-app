@@ -76,7 +76,7 @@ export const floorOffsets = {
     sofa:          0.02,
     bed:           0.01,
     table:         0.01,
-    lamp:          1.8,
+    lamp:          1.9,
     wardrobe:      0.2,
     bookshelf:     0.1,
     coffee_table:  0.01,

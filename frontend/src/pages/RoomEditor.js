@@ -11,13 +11,13 @@ import {
 } from '../components/FurnitureManager';
 
 const roomDefinitions = {
-    living:  { default:{ width:600, depth:500, height:300 }, textures:{ floor:'/textures/wood_floor.jpg',       wall:'/textures/living_wall.jpg' } },
-    kitchen: { default:{ width:400, depth:300, height:300 }, textures:{ floor:'/textures/tile_floor.jpg',       wall:'/textures/kitchen_wall.jpg' } },
-    bed:     { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/carpet_floor.jpg',     wall:'/textures/bedroom_wall_.jpg' } },
-    office:  { default:{ width:400, depth:400, height:300 }, textures:{ floor:'/textures/laminate_floor.jpg',   wall:'/textures/office_wall.jpg' } },
-    bath:    { default:{ width:300, depth:250, height:300 }, textures:{ floor:'/textures/bath_floor_tile.jpg',  wall:'/textures/bathroom_wall.jpg' } },
-    dining:  { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/wood_floor2.jpg',      wall:'/textures/dining_wall.jpg' } },
-    study:   { default:{ width:400, depth:350, height:300 }, textures:{ floor:'/textures/laminate_floor2.jpg',  wall:'/textures/study_wall.jpg' } }
+    living:  { default:{ width:600, depth:500, height:300 }, textures:{ floor:'/textures/wood_floor.jpg',      wall:'/textures/living_wall.jpg' } },
+    kitchen: { default:{ width:400, depth:300, height:300 }, textures:{ floor:'/textures/tile_floor.jpg',      wall:'/textures/kitchen_wall.jpg' } },
+    bed:     { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/carpet_floor.jpg',    wall:'/textures/bedroom_wall_.jpg' } },
+    office:  { default:{ width:400, depth:400, height:300 }, textures:{ floor:'/textures/laminate_floor.jpg',  wall:'/textures/office_wall.jpg' } },
+    bath:    { default:{ width:300, depth:250, height:300 }, textures:{ floor:'/textures/bath_floor_tile.jpg', wall:'/textures/bathroom_wall.jpg' } },
+    dining:  { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/wood_floor2.jpg',     wall:'/textures/dining_wall.jpg' } },
+    study:   { default:{ width:400, depth:350, height:300 }, textures:{ floor:'/textures/laminate_floor2.jpg', wall:'/textures/study_wall.jpg' } }
 };
 
 export default function RoomEditor() {
@@ -26,11 +26,13 @@ export default function RoomEditor() {
     const { search }  = useLocation();
     const designId    = new URLSearchParams(search).get('design');
 
-    const defOrig  = roomDefinitions[roomKey];
-    const roomDef  = defOrig || roomDefinitions['living'];
-    const def      = roomDef.default;
-    const textures = roomDef.textures;
+    // pick room definition
+    const defOrig   = roomDefinitions[roomKey];
+    const roomDef   = defOrig || roomDefinitions['living'];
+    const def       = roomDef.default;
+    const textures  = roomDef.textures;
 
+    // state
     const [view,      setView]      = useState('2D');
     const [width,     setWidth]     = useState(def.width);
     const [depth,     setDepth]     = useState(def.depth);
@@ -39,7 +41,7 @@ export default function RoomEditor() {
     const [furniture, setFurniture] = useState([]);
     const [selected,  setSelected]  = useState(null);
 
-    // load a saved design (and convert its saved relative coords → absolute)
+    // load existing design if editing
     useEffect(() => {
         if (!designId) return;
         API.get(`/designs/${designId}`)
@@ -47,51 +49,48 @@ export default function RoomEditor() {
                 const d  = res.data.design;
                 const x0 = (window.innerWidth  - d.width) / 2;
                 const y0 = (window.innerHeight - d.depth) / 2;
-
                 setWidth(d.width);
                 setDepth(d.depth);
                 setHeight(d.height);
                 setWallTint(d.wallTint);
                 setFurniture(d.furniture.map(i => ({
                     ...i,
-                    x: x0 + i.x,   // saved i.x was relative to room
+                    x: x0 + i.x,
                     y: y0 + i.y
                 })));
-                setSelected(null);
             })
-            .catch(err => console.error('Failed to load design', err));
+            .catch(console.error);
     }, [designId]);
 
-    // save current design (convert absolute coords → relative before sending)
+    // save new design
     const saveDesign = () => {
         const x0 = (window.innerWidth  - width) / 2;
         const y0 = (window.innerHeight - depth) / 2;
-
         const rel = furniture.map(i => ({
             ...i,
             x: i.x - x0,
             y: i.y - y0
         }));
-
-        API.post('/designs', {
-            roomKey,
-            width,
-            depth,
-            height,
-            wallTint,
-            furniture: rel
-        })
-            .then(() => {
-                alert('Design saved!');
-                nav('/dashboard');
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Failed to save design.');
-            });
+        API.post('/designs', { roomKey, width, depth, height, wallTint, furniture: rel })
+            .then(() => { alert('Design saved!'); nav('/dashboard'); })
+            .catch(err => { console.error(err); alert('Save failed'); });
     };
 
-    // fallback
+    // update existing
+    const updateDesign = () => {
+        const x0 = (window.innerWidth  - width) / 2;
+        const y0 = (window.innerHeight - depth) / 2;
+        const rel = furniture.map(i => ({
+            ...i,
+            x: i.x - x0,
+            y: i.y - y0
+        }));
+        API.put(`/designs/${designId}`, { roomKey, width, depth, height, wallTint, furniture: rel })
+            .then(() => { alert('Design updated!'); nav('/dashboard'); })
+            .catch(err => { console.error(err); alert('Update failed'); });
+    };
+
+    // fallback for unknown rooms
     if (!defOrig && view === '2D') {
         return (
             <div style={styles.fallback}>
@@ -101,7 +100,7 @@ export default function RoomEditor() {
         );
     }
 
-    // compute editor offsets
+    // compute canvas offset
     const vw = window.innerWidth, vh = window.innerHeight;
     const x0 = (vw - width) / 2, y0 = (vh - depth) / 2;
 
@@ -110,51 +109,49 @@ export default function RoomEditor() {
         const { iconW, iconH } = getIconSize(type);
         setFurniture(f => [
             ...f,
-            { id:Date.now(), type, x:x0+width/2, y:y0+depth/2, iconW, iconH, rotation:defaultRotations[type]||0, color:null }
+            { id:Date.now(), type, x:x0 + width/2, y:y0 + depth/2, iconW, iconH, rotation: defaultRotations[type]||0, color: null }
         ]);
         setSelected(null);
     };
-    const resizeSel    = d => setFurniture(f => f.map(i => i.id===selected ? {...i, iconW:Math.max(10,i.iconW+d), iconH:Math.max(10,i.iconH+d)} : i));
-    const rotateSel    = d => setFurniture(f => f.map(i => i.id===selected ? {...i, rotation:(i.rotation+d+360)%360} : i));
-    const changeColor  = hex => setFurniture(f => f.map(i => i.id===selected ? {...i, color:hex} : i));
-    const deleteSel    = () => { setFurniture(f => f.filter(i=>i.id!==selected)); setSelected(null); };
+    const resizeSel    = d => setFurniture(f => f.map(i => i.id === selected ? { ...i, iconW: Math.max(10, i.iconW + d), iconH: Math.max(10, i.iconH + d) } : i));
+    const rotateSel    = d => setFurniture(f => f.map(i => i.id === selected ? { ...i, rotation: (i.rotation + d + 360) % 360 } : i));
+    const changeColor  = hex => setFurniture(f => f.map(i => i.id === selected ? { ...i, color: hex } : i));
+    const deleteSel    = () => { setFurniture(f => f.filter(i => i.id !== selected)); setSelected(null); };
 
     return (
         <div style={styles.container}>
-            {/* view toggle */}
+            {/* View toggle */}
             <div style={styles.tabs}>
-                {['2D','3D'].map(t=>(
+                {['2D','3D'].map(t => (
                     <button
                         key={t}
                         onClick={()=>setView(t)}
-                        style={{ ...styles.tab, ...(view===t?styles.activeTab:{}) }}
+                        style={{ ...styles.tab, ...(view === t ? styles.activeTab : {}) }}
                     >{t} View</button>
                 ))}
             </div>
 
-            {/* 2D or 3D canvas */}
-            {view==='2D' ? (
+            {/* 2D or 3D */}
+            {view === '2D' ? (
                 <Room2DView
-                    width={width}    setWidth={setWidth}
-                    depth={depth}    setDepth={setDepth}
-                    height={height}  setHeight={setHeight}
-                    x0={x0}          y0={y0}
-
+                    width={width}      setWidth={setWidth}
+                    depth={depth}      setDepth={setDepth}
+                    height={height}    setHeight={setHeight}
+                    x0={x0}            y0={y0}
                     furniture={furniture}
                     selectedId={selected}
                     setFurniture={setFurniture}
                     setSelected={setSelected}
-
                     addFurniture={addFurniture}
                     resizeSel={resizeSel}
                     rotateSel={rotateSel}
                     changeColor={changeColor}
                     deleteSel={deleteSel}
-
                     wallTint={wallTint}
                     setWallTint={setWallTint}
-
-                    onSave={saveDesign}   // <-- Save button callback
+                    onSave={saveDesign}
+                    onUpdate={updateDesign}
+                    isEditing={!!designId}
                 />
             ) : (
                 <Room3DView
