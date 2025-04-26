@@ -28,10 +28,10 @@ export default function RoomEditor() {
     const { search }  = useLocation();
     const designId    = new URLSearchParams(search).get('design');
 
-    const defOrig   = roomDefinitions[roomKey];
-    const roomDef   = defOrig || roomDefinitions['living'];
-    const def       = roomDef.default;
-    const textures  = roomDef.textures;
+    const defOrig    = roomDefinitions[roomKey];
+    const roomDef    = defOrig || roomDefinitions['living'];
+    const def        = roomDef.default;
+    const textures   = roomDef.textures;
 
     const [view,      setView]      = useState('2D');
     const [width,     setWidth]     = useState(def.width);
@@ -44,33 +44,51 @@ export default function RoomEditor() {
     // Load existing design if editing
     useEffect(() => {
         if (!designId) return;
+
         API.get(`/designs/${designId}`)
             .then(res => {
                 const d  = res.data.design;
-                const x0 = (window.innerWidth  - d.width ) / 2;
-                const y0 = (window.innerHeight - d.depth ) / 2;
+                const vw = window.innerWidth, vh = window.innerHeight;
+                const x0 = (vw - d.width ) / 2;
+                const y0 = (vh - d.depth ) / 2;
+
                 setWidth(d.width);
                 setDepth(d.depth);
                 setHeight(d.height);
                 setWallTint(d.wallTint);
-                setFurniture(d.furniture.map(i => ({
-                    ...i,
-                    x: x0 + i.x,
-                    y: y0 + i.y
-                })));
+
+                setFurniture(
+                    d.furniture.map(i => ({
+                        ...i,
+                        x: x0 + i.x,
+                        y: y0 + i.y
+                    }))
+                );
             })
-            .catch(console.error);
-    }, [designId]);
+            .catch(err => {
+                console.error(err);
+                Swal.fire(
+                    'Load failed',
+                    'Could not load saved design. Opening blank editor.',
+                    'error'
+                ).then(() => {
+                    // strip the ?design= so we fall back to a fresh 2D view
+                    nav(`/viewer/${roomKey}`, { replace: true });
+                });
+            });
+    }, [designId, roomKey, nav]);
 
     // Save new design
     const saveDesign = () => {
-        const x0 = (window.innerWidth  - width ) / 2;
-        const y0 = (window.innerHeight - depth ) / 2;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const x0 = (vw - width ) / 2;
+        const y0 = (vh - depth ) / 2;
         const rel = furniture.map(i => ({
             ...i,
             x: i.x - x0,
             y: i.y - y0
         }));
+
         API.post('/designs', { roomKey, width, depth, height, wallTint, furniture: rel })
             .then(() => {
                 Swal.fire('Saved!', 'Your design has been saved.', 'success')
@@ -83,13 +101,15 @@ export default function RoomEditor() {
 
     // Update existing design
     const updateDesign = () => {
-        const x0 = (window.innerWidth  - width ) / 2;
-        const y0 = (window.innerHeight - depth ) / 2;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const x0 = (vw - width ) / 2;
+        const y0 = (vh - depth ) / 2;
         const rel = furniture.map(i => ({
             ...i,
             x: i.x - x0,
             y: i.y - y0
         }));
+
         API.put(`/designs/${designId}`, { roomKey, width, depth, height, wallTint, furniture: rel })
             .then(() => {
                 Swal.fire('Updated!', 'Design updated successfully.', 'success')
@@ -112,6 +132,7 @@ export default function RoomEditor() {
             });
     };
 
+    // If the route is wrong, show a simple fallback
     if (!defOrig && view === '2D') {
         return (
             <div style={styles.fallback}>
@@ -129,18 +150,48 @@ export default function RoomEditor() {
         const { iconW, iconH } = getIconSize(type);
         setFurniture(f => [
             ...f,
-            { id: Date.now(), type, x: x0 + width/2, y: y0 + depth/2, iconW, iconH, rotation: defaultRotations[type]||0, color: null }
+            {
+                id:      Date.now(),
+                type,
+                x:       x0 + width/2,
+                y:       y0 + depth/2,
+                iconW,
+                iconH,
+                rotation: defaultRotations[type] || 0,
+                color:   null
+            }
         ]);
         setSelected(null);
     };
-    const resizeSel   = d => setFurniture(f => f.map(i => i.id===selected ? { ...i, iconW: Math.max(10, i.iconW + d), iconH: Math.max(10, i.iconH + d) } : i));
-    const rotateSel   = d => setFurniture(f => f.map(i => i.id===selected ? { ...i, rotation: (i.rotation + d + 360) % 360 } : i));
-    const changeColor = hex => setFurniture(f => f.map(i => i.id===selected ? { ...i, color: hex } : i));
-    const deleteSel   = () => { setFurniture(f => f.filter(i => i.id !== selected)); setSelected(null); };
+    const resizeSel   = delta => setFurniture(f =>
+        f.map(i => i.id === selected
+            ? { ...i,
+                iconW: Math.max(10, i.iconW + delta),
+                iconH: Math.max(10, i.iconH + delta)
+            }
+            : i
+        )
+    );
+    const rotateSel   = delta => setFurniture(f =>
+        f.map(i => i.id === selected
+            ? { ...i, rotation: (i.rotation + delta + 360) % 360 }
+            : i
+        )
+    );
+    const changeColor = hex => setFurniture(f =>
+        f.map(i => i.id === selected
+            ? { ...i, color: hex }
+            : i
+        )
+    );
+    const deleteSel   = () => {
+        setFurniture(f => f.filter(i => i.id !== selected));
+        setSelected(null);
+    };
 
     return (
         <div style={styles.container}>
-            {/* Modern Tab Bar */}
+            {/* Tab Bar */}
             <div style={styles.tabs}>
                 {['2D','3D'].map(t => (
                     <button
@@ -148,7 +199,7 @@ export default function RoomEditor() {
                         onClick={() => setView(t)}
                         style={{
                             ...styles.tab,
-                            ...(view === t ? styles.activeTab : {}),
+                            ...(view === t ? styles.activeTab : {})
                         }}
                     >
                         {t} View
@@ -156,28 +207,24 @@ export default function RoomEditor() {
                 ))}
             </div>
 
-            {/* Canvas or 3D */}
+            {/* 2D or 3D Editor */}
             {view === '2D' ? (
                 <Room2DView
-                    width={width} setWidth={setWidth}
-                    depth={depth} setDepth={setDepth}
-                    height={height} setHeight={setHeight}
-                    x0={x0} y0={y0}
-
+                    width={width}      setWidth={setWidth}
+                    depth={depth}      setDepth={setDepth}
+                    height={height}    setHeight={setHeight}
+                    x0={x0}            y0={y0}
                     furniture={furniture}
                     selectedId={selected}
                     setFurniture={setFurniture}
                     setSelected={setSelected}
-
                     addFurniture={addFurniture}
                     resizeSel={resizeSel}
                     rotateSel={rotateSel}
                     changeColor={changeColor}
                     deleteSel={deleteSel}
-
                     wallTint={wallTint}
                     setWallTint={setWallTint}
-
                     onSave={saveDesign}
                     onUpdate={updateDesign}
                     onDelete={deleteDesign}
@@ -194,10 +241,11 @@ export default function RoomEditor() {
                     textures={textures}
                     furnitureModels={furnitureModels}
                     wallTint={wallTint}
+                    enableControls
                 />
             )}
 
-            {/* Prominent Dashboard Button */}
+            {/* Back to Dashboard */}
             <button style={styles.dashboardBtn} onClick={() => nav('/dashboard')}>
                 ← Dashboard
             </button>
@@ -211,7 +259,7 @@ const styles = {
         width: '100vw',
         height: '100vh',
         fontFamily: 'Segoe UI, sans-serif',
-        overflow: 'hidden',
+        overflow: 'hidden'
     },
     tabs: {
         display: 'flex',
@@ -220,34 +268,34 @@ const styles = {
         left: '50%',
         transform: 'translateX(-50%)',
         background: '#fff',
-        padding: '8px',          // ↑ doubled from 4px
-        borderRadius: '28px',    // slightly larger pill
+        padding: '8px',
+        borderRadius: '28px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        zIndex: 20,
+        zIndex: 20
     },
     tab: {
         flex: 1,
-        padding: '12px 32px',    // ↑ from 8px 24px
-        fontSize: '16px',        // ↑ from default
+        padding: '12px 32px',
+        fontSize: '16px',
         border: 'none',
         background: 'transparent',
         borderRadius: '24px',
         cursor: 'pointer',
         fontWeight: 500,
         color: '#555',
-        transition: 'background .2s, color .2s',
+        transition: 'background .2s, color .2s'
     },
     activeTab: {
         background: 'linear-gradient(135deg,#4a90e2,#357abd)',
         color: '#fff',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
     },
     dashboardBtn: {
         position: 'absolute',
         top: 16,
         right: 16,
-        padding: '12px 24px',    // ↑ from 8px 16px
-        fontSize: '16px',        // ↑ from 14px
+        padding: '12px 24px',
+        fontSize: '16px',
         background: '#357abd',
         color: '#fff',
         border: 'none',
@@ -255,9 +303,9 @@ const styles = {
         cursor: 'pointer',
         fontWeight: 600,
         boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-        zIndex: 20,
+        zIndex: 20
     },
     fallback: { padding: 20 },
     fallbackText: { marginBottom: 12 },
-    backBtn: { padding: 8, background: '#286090', color: '#fff', border: 'none', borderRadius: 4 },
+    backBtn: { padding: 8, background: '#286090', color: '#fff', border: 'none', borderRadius: 4 }
 };
