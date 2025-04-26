@@ -1,32 +1,43 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import Swal from 'sweetalert2';
 import API from '../utils/api';
 import { saveToken } from '../utils/auth';
 
 export default function Login() {
     const [form, setForm] = useState({ email: '', password: '' });
-    const [error, setError] = useState('');
     const navigate = useNavigate();
 
-    const handleChange = (e) =>
+    const handleChange = e =>
         setForm({ ...form, [e.target.name]: e.target.value });
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async e => {
         e.preventDefault();
         try {
             const { data } = await API.post('/auth/login', form);
             saveToken(data.token);
+            await Swal.fire({
+                icon: 'success',
+                title: 'Logged in successfully',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 1500
+            });
             navigate('/dashboard');
         } catch (err) {
-            setError(err.response?.data?.error || 'Login failed');
+            await Swal.fire({
+                icon: 'error',
+                title: 'Login failed',
+                text: err.response?.data?.error || 'Please try again'
+            });
         }
     };
 
     return (
         <div style={styles.container}>
             <div style={styles.card}>
-                <h2 style={styles.title}>Login</h2>
-                {error && <p style={styles.error}>{error}</p>}
+                <h2 style={styles.title}>Sign In</h2>
                 <form onSubmit={handleSubmit} style={styles.form}>
                     <input
                         name="email"
@@ -46,10 +57,15 @@ export default function Login() {
                         style={styles.input}
                         required
                     />
-                    <button type="submit" style={styles.button}>Sign In</button>
+                    <button type="submit" style={styles.button}>
+                        Sign In
+                    </button>
                 </form>
                 <p style={styles.linkText}>
-                    Don't have an account? <Link to="/register" style={styles.link}>Register here</Link>
+                    Don't have an account?{' '}
+                    <Link to="/register" style={styles.link}>
+                        Register here
+                    </Link>
                 </p>
             </div>
         </div>
@@ -59,56 +75,56 @@ export default function Login() {
 const styles = {
     container: {
         minHeight: '100vh',
-        background: '#f0f4f8',
+        background: 'linear-gradient(145deg,#e0f7fa,#e8f5e9)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        fontFamily: `'Segoe UI','Helvetica Neue',Arial,sans-serif`
     },
     card: {
         background: '#fff',
-        padding: '32px',
+        padding: '40px',
         borderRadius: '12px',
-        boxShadow: '0 6px 18px rgba(0,0,0,0.1)',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.1)',
         width: '100%',
-        maxWidth: '400px',
+        maxWidth: '400px'
     },
     title: {
         marginBottom: '24px',
         textAlign: 'center',
-        color: '#333',
+        color: '#34495e',
+        fontSize: '24px'
     },
     form: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
+        gap: '16px'
     },
     input: {
         padding: '12px',
         fontSize: '16px',
         borderRadius: '8px',
-        border: '1px solid #ccc',
+        border: '1px solid #ccc'
     },
     button: {
-        background: '#007bff',
+        background: 'linear-gradient(135deg,#4a90e2,#357abd)',
         color: '#fff',
         padding: '12px',
         fontSize: '16px',
         border: 'none',
         borderRadius: '8px',
         cursor: 'pointer',
+        fontWeight: 600,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
     },
     linkText: {
         marginTop: '16px',
         textAlign: 'center',
-        fontSize: '14px',
+        fontSize: '14px'
     },
     link: {
-        color: '#007bff',
+        color: '#4a90e2',
         textDecoration: 'none',
-    },
-    error: {
-        color: 'red',
-        marginBottom: '12px',
-        textAlign: 'center',
-    },
+        fontWeight: 500
+    }
 };
