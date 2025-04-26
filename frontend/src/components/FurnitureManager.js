@@ -19,7 +19,7 @@ export const furnitureScales = {
     bookshelf:    0.006,
     coffee_table: 0.006,
     desk:         1,
-    dining_chair: 0.9
+    dining_chair: 0.5
 };
 
 // per-model footprint dimensions in meters (width, depth)
@@ -81,7 +81,7 @@ export const floorOffsets = {
     bookshelf:     0.1,
     coffee_table:  0.01,
     desk:          0.01,
-    dining_chair:  0.9
+    dining_chair:  0.5
 };
 export const DEFAULT_OFFSET = 0.01;
 
