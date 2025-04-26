@@ -1,3 +1,4 @@
+// src/pages/RoomEditor.js
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import API from '../utils/api';
@@ -15,10 +16,10 @@ const roomDefinitions = {
     living:  { default:{ width:600, depth:500, height:300 }, textures:{ floor:'/textures/wood_floor.jpg',      wall:'/textures/living_wall.jpg' } },
     kitchen: { default:{ width:400, depth:300, height:300 }, textures:{ floor:'/textures/tile_floor.jpg',      wall:'/textures/kitchen_wall.jpg' } },
     bed:     { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/carpet_floor.jpg',    wall:'/textures/bedroom_wall_.jpg' } },
-    office:  { default:{ width:400, depth:400, height:300 }, textures:{ floor:'/textures/office_floor.jpg',  wall:'/textures/office_wall.jpg' } },
-    bath:    { default:{ width:300, depth:250, height:300 }, textures:{ floor:'/textures/bath_floor_tile.jpg', wall:'/textures/bathroom_wall.jpg' } },
-    dining:  { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/wood_floor2.jpg',     wall:'/textures/dining_wall.jpg' } },
-    study:   { default:{ width:400, depth:350, height:300 }, textures:{ floor:'/textures/laminate_floor2.jpg', wall:'/textures/study_wall.jpg' } }
+    office:  { default:{ width:400, depth:400, height:300 }, textures:{ floor:'/textures/office_floor.jpg',     wall:'/textures/office_wall.jpg' } },
+    bath:    { default:{ width:300, depth:250, height:300 }, textures:{ floor:'/textures/bath_floor_tile.jpg',  wall:'/textures/bathroom_wall.jpg' } },
+    dining:  { default:{ width:500, depth:400, height:300 }, textures:{ floor:'/textures/wood_floor2.jpg',      wall:'/textures/dining_wall.jpg' } },
+    study:   { default:{ width:400, depth:350, height:300 }, textures:{ floor:'/textures/laminate_floor2.jpg',  wall:'/textures/study_wall.jpg' } }
 };
 
 export default function RoomEditor() {
@@ -40,14 +41,14 @@ export default function RoomEditor() {
     const [furniture, setFurniture] = useState([]);
     const [selected,  setSelected]  = useState(null);
 
-    // load existing
+    // Load existing design if editing
     useEffect(() => {
         if (!designId) return;
         API.get(`/designs/${designId}`)
             .then(res => {
                 const d  = res.data.design;
-                const x0 = (window.innerWidth  - d.width) / 2;
-                const y0 = (window.innerHeight - d.depth) / 2;
+                const x0 = (window.innerWidth  - d.width ) / 2;
+                const y0 = (window.innerHeight - d.depth ) / 2;
                 setWidth(d.width);
                 setDepth(d.depth);
                 setHeight(d.height);
@@ -61,10 +62,10 @@ export default function RoomEditor() {
             .catch(console.error);
     }, [designId]);
 
-    // save new
+    // Save new design
     const saveDesign = () => {
-        const x0 = (window.innerWidth  - width) / 2;
-        const y0 = (window.innerHeight - depth) / 2;
+        const x0 = (window.innerWidth  - width ) / 2;
+        const y0 = (window.innerHeight - depth ) / 2;
         const rel = furniture.map(i => ({
             ...i,
             x: i.x - x0,
@@ -80,10 +81,10 @@ export default function RoomEditor() {
             });
     };
 
-    // update existing
+    // Update existing design
     const updateDesign = () => {
-        const x0 = (window.innerWidth  - width) / 2;
-        const y0 = (window.innerHeight - depth) / 2;
+        const x0 = (window.innerWidth  - width ) / 2;
+        const y0 = (window.innerHeight - depth ) / 2;
         const rel = furniture.map(i => ({
             ...i,
             x: i.x - x0,
@@ -99,7 +100,7 @@ export default function RoomEditor() {
             });
     };
 
-    // delete design
+    // Delete design
     const deleteDesign = () => {
         API.delete(`/designs/${designId}`)
             .then(() => {
@@ -115,7 +116,7 @@ export default function RoomEditor() {
         return (
             <div style={styles.fallback}>
                 <p style={styles.fallbackText}>Unknown room type.</p>
-                <button style={styles.backBtn} onClick={()=>nav('/dashboard')}>← Back</button>
+                <button style={styles.backBtn} onClick={() => nav('/dashboard')}>← Back</button>
             </div>
         );
     }
@@ -123,34 +124,40 @@ export default function RoomEditor() {
     const vw = window.innerWidth, vh = window.innerHeight;
     const x0 = (vw - width) / 2, y0 = (vh - depth) / 2;
 
-    // furniture handlers
+    // Furniture handlers
     const addFurniture = type => {
         const { iconW, iconH } = getIconSize(type);
         setFurniture(f => [
             ...f,
-            { id:Date.now(), type, x:x0 + width/2, y:y0 + depth/2, iconW, iconH, rotation: defaultRotations[type]||0, color: null }
+            { id: Date.now(), type, x: x0 + width/2, y: y0 + depth/2, iconW, iconH, rotation: defaultRotations[type]||0, color: null }
         ]);
         setSelected(null);
     };
-    const resizeSel   = d => setFurniture(f => f.map(i => i.id===selected ? {...i, iconW:Math.max(10,i.iconW+d), iconH:Math.max(10,i.iconH+d)} : i));
-    const rotateSel   = d => setFurniture(f => f.map(i => i.id===selected ? {...i, rotation:(i.rotation+d+360)%360} : i));
-    const changeColor = hex => setFurniture(f => f.map(i => i.id===selected ? {...i, color:hex} : i));
-    const deleteSel   = () => { setFurniture(f => f.filter(i=>i.id!==selected)); setSelected(null); };
+    const resizeSel   = d => setFurniture(f => f.map(i => i.id===selected ? { ...i, iconW: Math.max(10, i.iconW + d), iconH: Math.max(10, i.iconH + d) } : i));
+    const rotateSel   = d => setFurniture(f => f.map(i => i.id===selected ? { ...i, rotation: (i.rotation + d + 360) % 360 } : i));
+    const changeColor = hex => setFurniture(f => f.map(i => i.id===selected ? { ...i, color: hex } : i));
+    const deleteSel   = () => { setFurniture(f => f.filter(i => i.id !== selected)); setSelected(null); };
 
     return (
         <div style={styles.container}>
-            {/* view toggle */}
+            {/* Modern Tab Bar */}
             <div style={styles.tabs}>
                 {['2D','3D'].map(t => (
                     <button
                         key={t}
-                        onClick={()=>setView(t)}
-                        style={{ ...styles.tab, ...(view===t?styles.activeTab:{}) }}
-                    >{t} View</button>
+                        onClick={() => setView(t)}
+                        style={{
+                            ...styles.tab,
+                            ...(view === t ? styles.activeTab : {}),
+                        }}
+                    >
+                        {t} View
+                    </button>
                 ))}
             </div>
 
-            {view==='2D' ? (
+            {/* Canvas or 3D */}
+            {view === '2D' ? (
                 <Room2DView
                     width={width} setWidth={setWidth}
                     depth={depth} setDepth={setDepth}
@@ -190,7 +197,8 @@ export default function RoomEditor() {
                 />
             )}
 
-            <button style={styles.backCorner} onClick={()=>nav('/dashboard')}>
+            {/* Prominent Dashboard Button */}
+            <button style={styles.dashboardBtn} onClick={() => nav('/dashboard')}>
                 ← Dashboard
             </button>
         </div>
@@ -198,12 +206,58 @@ export default function RoomEditor() {
 }
 
 const styles = {
-    container:    { position:'relative', width:'100vw', height:'100vh', fontFamily:'Segoe UI,sans-serif' },
-    tabs:         { display:'flex', position:'absolute', top:0,left:0,right:0,zIndex:2 },
-    tab:          { flex:1,padding:16,border:'none',background:'#d0d7de',cursor:'pointer' },
-    activeTab:    { background:'#286090',color:'#fff' },
-    backCorner:   { position:'absolute',top:12,left:12,padding:8,background:'#286090',color:'#fff',border:'none',borderRadius:4,cursor:'pointer',zIndex:3 },
-    fallback:     { padding:20 },
-    fallbackText: { marginBottom:12 },
-    backBtn:      { padding:8,background:'#286090',color:'#fff',border:'none',borderRadius:4 }
+    container: {
+        position: 'relative',
+        width: '100vw',
+        height: '100vh',
+        fontFamily: 'Segoe UI, sans-serif',
+        overflow: 'hidden',
+    },
+    tabs: {
+        display: 'flex',
+        position: 'absolute',
+        top: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#fff',
+        padding: '8px',          // ↑ doubled from 4px
+        borderRadius: '28px',    // slightly larger pill
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        zIndex: 20,
+    },
+    tab: {
+        flex: 1,
+        padding: '12px 32px',    // ↑ from 8px 24px
+        fontSize: '16px',        // ↑ from default
+        border: 'none',
+        background: 'transparent',
+        borderRadius: '24px',
+        cursor: 'pointer',
+        fontWeight: 500,
+        color: '#555',
+        transition: 'background .2s, color .2s',
+    },
+    activeTab: {
+        background: 'linear-gradient(135deg,#4a90e2,#357abd)',
+        color: '#fff',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+    },
+    dashboardBtn: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        padding: '12px 24px',    // ↑ from 8px 16px
+        fontSize: '16px',        // ↑ from 14px
+        background: '#357abd',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '24px',
+        cursor: 'pointer',
+        fontWeight: 600,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+        zIndex: 20,
+    },
+    fallback: { padding: 20 },
+    fallbackText: { marginBottom: 12 },
+    backBtn: { padding: 8, background: '#286090', color: '#fff', border: 'none', borderRadius: 4 },
 };
